@@ -6,12 +6,6 @@ from django.views.decorators.csrf import csrf_exempt
 from llm_core.api import CoreLLM  # Import CoreLLM model
 from llm_core.utils import traverse_directory  # Import function to extract code files
 
-# Ensure correct path for llm_core (if necessary)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LLM_CORE_PATH = os.path.abspath(os.path.join(BASE_DIR, '../llm_core'))
-if LLM_CORE_PATH not in sys.path:
-    sys.path.append(LLM_CORE_PATH)
-
 # Initialize CoreLLM
 core_llm = CoreLLM(verbose=False)
 core_llm.load_model("Gemini 2.0 Flash")  # You can change the model here
