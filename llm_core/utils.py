@@ -2,6 +2,7 @@
 
 import os
 import pprint
+import json
 
 def traverse_directory(root_dir):
     def read_file(file_path):
@@ -24,10 +25,9 @@ def traverse_directory(root_dir):
                 return read_file(current_path)
             return None  # Ignore non-code files
     
-    return traverse(root_dir)
+    return json.dumps(traverse(root_dir), indent=4)
 
 # Example Usage:
 # root_directory = r"D:\PROJECTS\CodeScribe\backend"
 # directory_structure = traverse_directory(root_directory)
 # pprint.pprint(directory_structure, indent=4)
-
