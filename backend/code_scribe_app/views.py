@@ -1,21 +1,23 @@
 import mistune
 import json
+import os
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
-from .models import Article  # Ensure your models.py has an Article model
-import os
+from .models import Article
+from llm_core.api import CoreLLM  # 確保正確導入 CoreLLM
 
 # Get the current directory path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# 初始化 LLM 模型
+llm = CoreLLM(verbose=False)
+llm.load_model("Gemini 2.0 Flash")  # 你可以換成自己的 LLM
+
 def parse_markdown(content=None, file_path=None):
     """
     Parse Markdown content or file into an AST JSON structure.
-    :param content: Markdown content as a string
-    :param file_path: Path to a Markdown file
-    :return: Parsed AST JSON
     """
-    if file_path:  # If a file path is provided, read file content
+    if file_path:
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
     
@@ -28,8 +30,6 @@ def parse_markdown(content=None, file_path=None):
 def build_nested_structure(ast):
     """
     Convert the Markdown AST into a nested JSON structure.
-    :param ast: Parsed Markdown AST JSON
-    :return: Nested dictionary
     """
     root = {}
     stack = [(root, 0)]  # (current level dictionary, heading level)
@@ -39,7 +39,6 @@ def build_nested_structure(ast):
             level = block["level"]
             title = block["children"][0]["text"]
 
-            # Create a new section
             new_section = {}
             while stack and stack[-1][1] >= level:
                 stack.pop()
@@ -48,7 +47,6 @@ def build_nested_structure(ast):
             stack.append((new_section, level))
 
         else:
-            # Convert other Markdown elements to plain text
             text_content = extract_text(block)
             if text_content:
                 stack[-1][0]["content"] = stack[-1][0].get("content", "") + "\n" + text_content
@@ -58,8 +56,6 @@ def build_nested_structure(ast):
 def extract_text(block):
     """
     Extract textual content from a Markdown AST block.
-    :param block: A single AST block
-    :return: Plain text content
     """
     if block["type"] in ["paragraph", "block_code", "list", "blockquote"]:
         if "children" in block:
@@ -67,20 +63,31 @@ def extract_text(block):
         return block.get("text", "")
     return ""
 
+def replace_code_with_model_output(nested_dict):
+    """
+    Traverse nested structure and replace Python code with model-generated content.
+    """
+    for key, value in nested_dict.items():
+        if isinstance(value, dict):
+            replace_code_with_model_output(value)
+        elif key == "content" and "```python" in value:
+            print("Sending code to LLM for generation...")  # Debug log
+            generated_md = llm(value)  # 讓 CoreLLM 生成新的 Markdown
+            nested_dict[key] = generated_md
+
 def markdown_view(request, article_id):
     """
     Django API view to return a structured Markdown AST JSON.
-    :param request: Django request object
-    :param article_id: Article ID
-    :return: JSONResponse with nested JSON structure
     """
-    if article_id == 0:  # Special case: Load test.md instead of database content
+    if article_id == 0:
         ast = parse_markdown(file_path=os.path.join(BASE_DIR, "test.md"))
     else:
         article = get_object_or_404(Article, id=article_id)
         ast = parse_markdown(article.content)
 
     structured_data = build_nested_structure(ast)
+    replace_code_with_model_output(structured_data)
+    
     return JsonResponse(structured_data, json_dumps_params={"ensure_ascii": False, "indent": 2})
 
 def home(request):
