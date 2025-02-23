@@ -1,6 +1,6 @@
 # code_scribe_app/urls.py
 from django.urls import path
-from .views import markdown_view, home
+from .views import markdown_view, upload_folder, home
 
 urlpatterns = [
     path('', home, name="home"),
