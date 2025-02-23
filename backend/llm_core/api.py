@@ -12,10 +12,10 @@ class CoreLLM:
         self.model_name = None
         self.client = None
         self.tokenizer = None
-        load_dotenv("llm_core\.env")
+        load_dotenv("llm_core/.env")
         self.verbose = verbose
 
-        with open("llm_core\prompt.txt", "r", encoding="utf-8") as file:
+        with open("llm_core/prompt.txt", "r", encoding="utf-8") as file:
             self.prompt_template = file.read().strip()  # Read and strip extra whitespace
 
     def load_model(self, model_name:str):

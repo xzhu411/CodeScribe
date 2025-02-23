@@ -1,125 +1,74 @@
-import mistune
 import json
+import os
+import sys
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import get_object_or_404
-from .models import Article  # import Article model
 from django.views.decorators.csrf import csrf_exempt
-from code_scribe_app.test_model import generate_markdown
+from llm_core.api import CoreLLM  # Import CoreLLM model
+from llm_core.utils import traverse_directory  # Import function to extract code files
 
+# Ensure correct path for llm_core (if necessary)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LLM_CORE_PATH = os.path.abspath(os.path.join(BASE_DIR, '../llm_core'))
+if LLM_CORE_PATH not in sys.path:
+    sys.path.append(LLM_CORE_PATH)
 
-# def model_processing(command):
-#     """模拟模型返回 Markdown"""
-#     if command == "generate summary":
-#         # 需要和model链接
-#         md_result = generate_markdown("Summarize the importance of AI in 3 sentences.")
-#         return md_result
-#     else:
-#         return "# Error\nInvalid command."
+# Initialize CoreLLM
+core_llm = CoreLLM(verbose=False)
+core_llm.load_model("Gemini 2.0 Flash")  # You can change the model here
 
-# command needs to be string
-def model_processing(command):
-    """use the model to generate markdown"""
-    md_result = generate_markdown(command)  # Pass the real command
-    return md_result if md_result else "# Error\nInvalid command."
+def process_code_files(directory_structure):
+    """
+    Recursively process directory structure and replace code files with their Markdown versions.
+    """
+    if isinstance(directory_structure, dict):
+        updated_structure = {}
+        for key, value in directory_structure.items():
+            updated_structure[key] = process_code_files(value)  # Recursively process subdirectories
+        return updated_structure
+    elif isinstance(directory_structure, str):
+        # If it's a string, it's code content, so process it with LLM
+        markdown_response = core_llm(directory_structure)
+        return markdown_response
+    else:
+        return directory_structure  # If None or unknown type, return as-is
 
-
-# parse_markdown function
-
-def parse_markdown(content):
-    """Convert Markdown to JSON-like AST format"""
-    if not content.strip():  # Ensure content is not empty
-        return [{"type": "error", "message": "Empty Markdown content"}]
-
-    parser = mistune.create_markdown(renderer="ast")
-    ast = parser(content)
-    print("DEBUG: Parsed AST Structure:", ast)  # Debug log
-    return ast
-
-
-
-
-def paginate_markdown(article_id, page_number, page_size=1):
-    """Paginate the Markdown content of an article"""
-    article = get_object_or_404(Article, id=article_id)
-    ast = parse_markdown(article.content)
-
-    pages = []
-    current_page = []
-    
-    for block in ast:
-        if block["type"] == "heading":
-            level = block.get("attrs", {}).get("level")  # get heading level
-            if level == 1:
-                if current_page:
-                    pages.append(current_page)
-                current_page = [block]
-        else:
-            current_page.append(block)
-
-    if current_page:
-        pages.append(current_page)
-
-    total_pages = len(pages)
-
-    if page_number < 1 or page_number > total_pages:
-        return JsonResponse({
-            "status": "error",
-            "message": "Page number out of range",
-            "total_pages": total_pages
-        }, status=400)
-
-    return JsonResponse({
-        "status": "success",
-        "message": "Retrieved page successfully",
-        "data": {
-            "page": page_number,
-            "page_size": page_size,
-            "total_pages": total_pages,
-            "content": pages[page_number - 1]
-        }
-    })
-
-
-# we don't need this anymore
-# # API 路由
-# def markdown_view(request, article_id):
-#     """處理 API 請求，返回指定文章 & 頁碼的 Markdown JSON"""
-#     page_number = int(request.GET.get('page', 1))  # 頁碼從 GET 參數獲取
-#     return paginate_markdown(article_id, page_number)
-
-
-# api route
 @csrf_exempt
-def process_model_request(request):
-    """处理前端请求，把指令交给模型处理，并返回 JSON"""
-    print(f"Received request: {request.body}")  # Debugging log
+def generate_markdown_from_directory(request):
+    """Handles API request, retrieves directory structure, processes code, and returns Markdown."""
     
     if request.method == "POST":
         try:
-            data = json.loads(request.body)  # Parse JSON data
-            command = data.get("command", "").strip()
+            # Parse JSON request
+            data = json.loads(request.body)
+            directory_path = data.get("directory_path", "").strip()
 
-            if not command:
-                return JsonResponse({"status": "error", "message": "Input cannot be empty"}, status=400)
+            if not directory_path:
+                return JsonResponse({"status": "error", "message": "Directory path cannot be empty"}, status=400)
+            
+            if not os.path.exists(directory_path):
+                return JsonResponse({"status": "error", "message": "Directory does not exist"}, status=400)
+            
+            # Extract code structure as a formatted dictionary
+            directory_structure = json.loads(traverse_directory(directory_path))
 
-            # get the markdown string
-            markdown_str = model_processing(command)
+            if not directory_structure:
+                return JsonResponse({"status": "error", "message": "No valid code found in directory"}, status=400)
 
-            # turn the markdown string into AST
-            ast = parse_markdown(markdown_str)
+            # Process the extracted code files and convert them into Markdown
+            markdown_structure = process_code_files(directory_structure)
 
             return JsonResponse({
                 "status": "success",
                 "message": "Generated markdown successfully",
-                "data": {"doc": ast}
+                "data": markdown_structure
             })
 
         except json.JSONDecodeError:
             return JsonResponse({"status": "error", "message": "Invalid JSON format"}, status=400)
-
+    
     return JsonResponse({"status": "error", "message": "Invalid request method"}, status=405)
 
 
-# home page
+# Home Page
 def home(request):
     return HttpResponse("Welcome to CodeScribe!")
