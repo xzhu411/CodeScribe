@@ -18,7 +18,7 @@ from code_scribe_app.test_model import generate_markdown
 
 # command needs to be string
 def model_processing(command):
-    """调用 LLM 处理指令并返回 Markdown"""
+    """use the model to generate markdown"""
     md_result = generate_markdown(command)  # Pass the real command
     return md_result if md_result else "# Error\nInvalid command."
 
@@ -39,7 +39,7 @@ def parse_markdown(content):
 
 
 def paginate_markdown(article_id, page_number, page_size=1):
-    """提取 Markdown, 转换为 JSON, 并按 H1 分页"""
+    """Paginate the Markdown content of an article"""
     article = get_object_or_404(Article, id=article_id)
     ast = parse_markdown(article.content)
 
