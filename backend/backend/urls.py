@@ -14,15 +14,25 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# # backend/urls.py
+# from django.contrib import admin
+# from django.urls import path, include
+# from code_scribe_app.views import home  # 引入主页视图
+
+# urlpatterns = [
+#     path('admin/', admin.site.urls),
+#     path('', include('code_scribe_app.urls')),  # 包含 codescribe 应用的 URL 配置
+#     # 其他应用的 URL 配置
+# ]
+
 # backend/urls.py
 from django.contrib import admin
 from django.urls import path, include
-from code_scribe_app.views import home  # 引入主页视图
+from code_scribe_app.views import home  # home page view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('code_scribe_app/', include('code_scribe_app.urls')),  # 包含 codescribe 应用的 URL 配置
-    path('', home, name='home'),  # 添加根路径 URL 访问主页
-    # 其他应用的 URL 配置
+    path('', home, name='home'),  # home page URL
+    path('api/', include('code_scribe_app.urls')),  # make API URLs start with /api/
 ]
 
