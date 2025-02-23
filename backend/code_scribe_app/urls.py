@@ -4,5 +4,5 @@ from .views import markdown_view, home
 
 urlpatterns = [
     path('', home, name="home"),
-    path('markdown/<int:article_id>/', markdown_view, name='markdown_api'),
+    path('markdown/<int:article_id>/', markdown_view, name='markdown_view'),
 ]
